@@ -6,6 +6,11 @@ import time
 from datetime import datetime
 from bs4 import BeautifulSoup
 
+try:
+    from application.db import insert_deals
+except ModuleNotFoundError:
+    from db import insert_deals
+
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -65,10 +70,6 @@ def validate_game_record(record):
     # All checks passed!
     return True, ""
 
-
-
-
-
 def fetch_page(max_retries=3, timeout=10):
     """
     Fetch Steam specials page with safety features.
@@ -119,7 +120,6 @@ def fetch_page(max_retries=3, timeout=10):
     
     logger.error(f"Failed to fetch page after {max_retries} attempts.")
     return None
-
 
 
 def scrape_deals(page, rate_limit_delay=1):
@@ -272,10 +272,9 @@ if __name__ == "__main__":
         logger.warning("No valid records scraped.")
         exit(0)
     
-    # For now, just print the records (Phase 3 will add MongoDB insert)
-    logger.info("=== Scraped Records ===")
+    inserted_count = insert_deals(valid_records)
+    logger.info(f"Inserted {inserted_count} records into MongoDB")
+
+    logger.info("=== Inserted Records ===")
     for record in valid_records:
         print(f"  {record['title']}: {record['discount_pct']}% off (${record['discounted_price']})")
-    
-    logger.info(f"Total valid records: {len(valid_records)}")
-
