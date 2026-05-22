@@ -4,6 +4,8 @@
 
 Built as a personal learning project to practice web scraping, NoSQL databases, data analysis, and machine learning — all with Python.
 
+For AI-assisted development, see [AGENTS.md](AGENTS.md) and [.github/copilot-instructions.md](.github/copilot-instructions.md).
+
 ---
 
 ## 🎯 Goal
@@ -22,7 +24,7 @@ The final deliverable is a Jupyter notebook with charts and a simple ML model th
 |---------------|---------------------------|-------------------------------------|
 | Scraping      | `requests` + `bs4`        | Fetch and parse Steam HTML          |
 | Database      | MongoDB Atlas (free tier) | Store and persist scraped data      |
-| Scheduling    | `schedule`                | Automate scraper runs every 6–12h   |
+| Scheduling    | `schedule`                | Daily automated scraper runs        |
 | Analysis      | `pandas`                  | Query and manipulate collected data |
 | Visualization | `matplotlib` + `seaborn`  | Charts and plots                    |
 | ML            | `scikit-learn`            | Deal quality classifier             |
@@ -41,6 +43,7 @@ steamscope/
 ├── .python-version            # Pinned Python version for uv
 ├── .env                       # Secrets — NEVER commit this
 ├── .env.example               # Template for .env — safe to commit
+├── AGENTS.md                  # Short agent status and pointers
 ├── .gitignore
 ├── LICENSE
 ├── README.md
@@ -48,25 +51,23 @@ steamscope/
 ├── application/               # Core source package
 │   ├── scraper.py             # Fetches and parses Steam deals page
 │   ├── db.py                  # MongoDB connection and insert/query logic
-│   └── scheduler.py           # Automated run logic (calls scraper every 6–12h)
+│   └── scheduler.py           # Daily scheduled runs + logging
 │
 ├── analysis/                  # Data analysis and ML
 │   ├── notebook.ipynb         # Main analysis notebook (charts + model)
 │   └── model.py               # Extracted ML logic (optional standalone)
 │
-├── logs/                      # Auto-generated at runtime, not committed
-│   └── scraper.log            # One line per run: timestamp + result
-│
-└── tests/
-    ├── test_scraper.py        # Unit tests for scraper logic
-    └── test_db.py             # Unit tests for DB connection and inserts
+└── logs/                      # Auto-generated at runtime, not committed
+    └── scraper.log            # One line per run: timestamp + result
 ```
 
 ---
 
 ## 📦 Data Schema
 
-Each document stored in MongoDB represents one game scraped in one run:
+### Current (stored today)
+
+Each document in `steamscope.deals` represents one game from one scrape run:
 
 ```json
 {
@@ -74,11 +75,20 @@ Each document stored in MongoDB represents one game scraped in one run:
   "original_price":   199.99,
   "discounted_price": 99.99,
   "discount_pct":     50,
-  "genres":           ["RPG", "Action"],
-  "rating":           "Very Positive",
-  "review_count":     120400,
   "url":              "https://store.steampowered.com/app/...",
   "scraped_at":       "2025-03-25T14:00:00"
+}
+```
+
+### Planned (before analysis / ML)
+
+Add these fields in a future scraper step (required for genre/rating charts and the ML model):
+
+```json
+{
+  "genres":       ["RPG", "Action"],
+  "rating":       "Very Positive",
+  "review_count": 120400
 }
 ```
 
@@ -87,10 +97,10 @@ Each document stored in MongoDB represents one game scraped in one run:
 ## 🗺️ Roadmap
 
 - [x] Phase 1 — Project setup and folder structure
-- [ ] Phase 2 — Steam scraper (single page, console output only)
-- [ ] Phase 3 — MongoDB integration (`db.py`)
+- [x] Phase 2 — Steam scraper (single page, validation, MongoDB insert)
+- [x] Phase 3 — MongoDB integration (`db.py`)
 - [ ] Phase 4 — Pagination (scrape 4–5 pages per run, ~100–125 games)
-- [ ] Phase 5 — Scheduler + logging (`scheduler.py` + `main.py`)
+- [x] Phase 5 — Scheduler + logging (`scheduler.py` + `main.py`)
 - [ ] Phase 6 — Data collection period *(let it run for 3–5 days)*
 - [ ] Phase 7 — Visualization notebook (4+ charts)
 - [ ] Phase 8 — ML model: "great deal" classifier
@@ -101,7 +111,7 @@ Each document stored in MongoDB represents one game scraped in one run:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.14+ (see `.python-version` and `pyproject.toml`)
 - [`uv`](https://github.com/astral-sh/uv) package manager
 - A free [MongoDB Atlas](https://www.mongodb.com/atlas) account
 
@@ -136,21 +146,32 @@ Open `.env` and fill in your MongoDB Atlas connection string:
 
 ```
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/steamscope
+SCRAPE_TIME=06:00
+RUN_ON_STARTUP=false
 ```
 
-### 5. Run the scraper manually (test)
+- `SCRAPE_TIME` — 24-hour format (`HH:MM`); scheduler runs the scraper once per day at this time.
+- `RUN_ON_STARTUP` — set to `true` to run one scrape immediately when starting `main.py`.
+
+### 5. Test MongoDB connection (optional)
+
+```bash
+uv run python application/db.py
+```
+
+### 6. Run the scraper manually (test)
 
 ```bash
 uv run python application/scraper.py
 ```
 
-### 6. Start the scheduler
+### 7. Start the scheduler
 
 ```bash
 uv run python main.py
 ```
 
-The scheduler will run the scraper automatically every 6 hours and log each run to `logs/scraper.log`.
+The scheduler runs the scraper once per day at `SCRAPE_TIME` and logs each run to `logs/scraper.log`.
 
 ---
 
@@ -170,10 +191,14 @@ This project uses MongoDB Atlas M0 — free forever, no credit card required.
 
 ## 📊 Planned Visualizations
 
+Requires `genres` and `rating` in the database (see planned schema above).
+
 - **Bar chart** — top discounted genres
 - **Histogram** — discount % distribution across all games
 - **Heatmap** — average discount by day of week scraped
 - **Scatter plot** — rating vs. discount % correlation
+
+Charts that work with the **current** schema: histogram (discount %), heatmap (day of week from `scraped_at`).
 
 ---
 
@@ -181,16 +206,18 @@ This project uses MongoDB Atlas M0 — free forever, no credit card required.
 
 | | |
 |---|---|
-| **Target** | `is_great_deal` — `True` if `discount_pct >= 50` AND rating is "Mostly Positive" or better |
+| **Target** | `is_great_deal` — `True` if `discount_pct >= 50` AND `rating` is in `["Very Positive", "Mostly Positive", "Overwhelmingly Positive"]` |
 | **Features** | genre (encoded), original price, review count, day of week |
 | **Model** | `RandomForestClassifier` |
 | **Evaluation** | Accuracy score + confusion matrix |
+
+Blocked until `genres`, `rating`, and `review_count` are scraped and stored.
 
 ---
 
 ## 📋 Requirements
 
-- Python 3.11+
+- Python 3.14+
 - MongoDB Atlas account (free)
 - Internet connection for scraping and DB access
 

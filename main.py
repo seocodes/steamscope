@@ -1,5 +1,8 @@
+from application.scheduler import start_scheduler
+
+
 def main():
-    print("Hello from steamscope!")
+    start_scheduler()
 
 
 if __name__ == "__main__":
