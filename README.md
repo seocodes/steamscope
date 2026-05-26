@@ -2,7 +2,7 @@
 
 > A Steam deals tracker that scrapes, stores, and analyzes game discounts over time.
 
-Built as a personal learning project to practice web scraping, NoSQL databases, data analysis, and machine learning — all with Python.
+Built as a personal learning project to practice web scraping, NoSQL databases, data analysis, and AI-assisted recommendations — all with Python.
 
 For AI-assisted development, see [AGENTS.md](AGENTS.md) and [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
@@ -12,23 +12,23 @@ For AI-assisted development, see [AGENTS.md](AGENTS.md) and [.github/copilot-ins
 
 Answer the question:
 
-> *"What kinds of games go on sale the most, how deep are the discounts, and is there a pattern in when deals happen?"*
+> *"Is this discount actually good for this game?"*
 
-The final deliverable is a Jupyter notebook with charts and a simple ML model that predicts whether a game is a **"great deal"** based on its features.
+The final deliverable is a **simple website** where you pick a game, enter a proposed sale price, and get a plain-language verdict — powered by **historical data in MongoDB** and **Google Gemini** analyzing a compact JSON summary of that game's past deals.
 
 ---
 
 ## 🧰 Tech Stack
 
-| Layer         | Tool                      | Purpose                             |
-|---------------|---------------------------|-------------------------------------|
-| Scraping      | `requests` + `bs4`        | Fetch and parse Steam HTML          |
-| Database      | MongoDB Atlas (free tier) | Store and persist scraped data      |
-| Scheduling    | `schedule`                | Daily automated scraper runs        |
-| Analysis      | `pandas`                  | Query and manipulate collected data |
-| Visualization | `matplotlib` + `seaborn`  | Charts and plots                    |
-| ML            | `scikit-learn`            | Deal quality classifier             |
-| Notebook      | `jupyter`                 | Interactive analysis environment    |
+| Layer         | Tool                      | Purpose                                      |
+|---------------|---------------------------|----------------------------------------------|
+| Scraping      | `requests` + `bs4`        | Fetch and parse Steam HTML                   |
+| Database      | MongoDB Atlas (free tier) | Store and persist scraped data               |
+| Scheduling    | `schedule`                | Daily automated scraper runs                 |
+| Analysis      | `pymongo` + Python        | Query history, build deal context JSON       |
+| Web           | FastAPI + HTML templates  | Game picker, price input, verdict display    |
+| AI            | Google Gemini API         | Judge if a proposed discount is good         |
+| Notebook      | `jupyter` (optional)      | Exploratory charts only                      |
 
 ---
 
@@ -50,12 +50,22 @@ steamscope/
 │
 ├── application/               # Core source package
 │   ├── scraper.py             # Fetches and parses Steam deals page
-│   ├── db.py                  # MongoDB connection and insert/query logic
-│   └── scheduler.py           # Daily scheduled runs + logging
+│   ├── db.py                  # MongoDB connection, insert, and queries
+│   ├── scheduler.py           # Daily scheduled runs + logging
+│   ├── context.py             # (planned) Build deal context JSON
+│   └── gemini_advisor.py      # (planned) Call Gemini for verdict
 │
-├── analysis/                  # Data analysis and ML
-│   ├── notebook.ipynb         # Main analysis notebook (charts + model)
-│   └── model.py               # Extracted ML logic (optional standalone)
+├── web/                       # (planned) Deal advisor website
+│   ├── app.py                 # FastAPI routes
+│   ├── templates/
+│   │   └── index.html         # Game select + price form + verdict
+│   └── static/                # Optional minimal CSS
+│
+├── scripts/                   # (planned) CLI helpers
+│   └── print_context.py       # Dump context JSON for one title
+│
+├── analysis/                  # Optional — not on critical path
+│   └── notebook.ipynb         # Exploratory charts only
 │
 └── logs/                      # Auto-generated at runtime, not committed
     └── scraper.log            # One line per run: timestamp + result
@@ -80,9 +90,11 @@ Each document in `steamscope.deals` represents one game from one scrape run:
 }
 ```
 
-### Planned (before analysis / ML)
+This schema is enough for Phases 7–8 (price history over time).
 
-Add these fields in a future scraper step (required for genre/rating charts and the ML model):
+### Optional enrichment
+
+These fields improve AI context but are **not required** for the deal advisor:
 
 ```json
 {
@@ -102,8 +114,8 @@ Add these fields in a future scraper step (required for genre/rating charts and 
 - [ ] Phase 4 — Pagination (scrape 4–5 pages per run, ~100–125 games)
 - [x] Phase 5 — Scheduler + logging (`scheduler.py` + `main.py`)
 - [ ] Phase 6 — Data collection period *(let it run for 3–5 days)*
-- [ ] Phase 7 — Visualization notebook (4+ charts)
-- [ ] Phase 8 — ML model: "great deal" classifier
+- [ ] Phase 7 — MongoDB deal context builder (`context.py`, db queries)
+- [ ] Phase 8 — Deal advisor website + Gemini (`web/`, `gemini_advisor.py`)
 
 ---
 
@@ -114,6 +126,7 @@ Add these fields in a future scraper step (required for genre/rating charts and 
 - Python 3.14+ (see `.python-version` and `pyproject.toml`)
 - [`uv`](https://github.com/astral-sh/uv) package manager
 - A free [MongoDB Atlas](https://www.mongodb.com/atlas) account
+- A [Google AI Studio](https://aistudio.google.com/) API key for Gemini (Phase 8)
 
 ### 1. Clone the repository
 
@@ -142,16 +155,18 @@ This reads `uv.lock` and installs the exact same versions used in development �
 cp .env.example .env
 ```
 
-Open `.env` and fill in your MongoDB Atlas connection string:
+Open `.env` and fill in your values:
 
 ```
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/steamscope
 SCRAPE_TIME=06:00
 RUN_ON_STARTUP=false
+GEMINI_API_KEY=your_key_here
 ```
 
 - `SCRAPE_TIME` — 24-hour format (`HH:MM`); scheduler runs the scraper once per day at this time.
 - `RUN_ON_STARTUP` — set to `true` to run one scrape immediately when starting `main.py`.
+- `GEMINI_API_KEY` — required for Phase 8 (deal advisor); get one from Google AI Studio.
 
 ### 5. Test MongoDB connection (optional)
 
@@ -189,29 +204,54 @@ This project uses MongoDB Atlas M0 — free forever, no credit card required.
 
 ---
 
-## 📊 Planned Visualizations
+## 🤖 Deal Advisor (Phases 7–8)
 
-Requires `genres` and `rating` in the database (see planned schema above).
+### User flow
 
-- **Bar chart** — top discounted genres
-- **Histogram** — discount % distribution across all games
-- **Heatmap** — average discount by day of week scraped
-- **Scatter plot** — rating vs. discount % correlation
+1. Pick a game from a dropdown (titles scraped into MongoDB).
+2. Enter the **proposed discounted price** you are considering.
+3. The backend loads that game's price history, builds a JSON context, and asks Gemini for a verdict.
+4. The site shows a short answer: **good**, **fair**, or **wait**, plus a brief explanation.
 
-Charts that work with the **current** schema: histogram (discount %), heatmap (day of week from `scraped_at`).
+### Example context JSON (sent to Gemini)
+
+```json
+{
+  "game": "Elden Ring",
+  "proposed_discounted_price": 39.99,
+  "history": {
+    "scrape_count": 12,
+    "first_seen": "2025-03-20T06:00:00",
+    "last_seen": "2025-03-25T06:00:00",
+    "lowest_discounted_price": 34.99,
+    "highest_discounted_price": 59.99,
+    "average_discounted_price": 44.50,
+    "average_discount_pct": 38,
+    "recent_snapshots": [
+      { "discounted_price": 39.99, "discount_pct": 50, "scraped_at": "2025-03-25T06:00:00" }
+    ]
+  }
+}
+```
+
+### Planned API routes (Phase 8)
+
+| Route          | Method | Purpose                                              |
+|----------------|--------|------------------------------------------------------|
+| `/`            | GET    | Render the form                                      |
+| `/api/games`   | GET    | List distinct game titles from MongoDB               |
+| `/api/advise`  | POST   | `{ "title": "...", "proposed_price": 29.99 }` → verdict |
 
 ---
 
-## 🤖 ML Model
+## 📊 Optional Visualizations
 
-| | |
-|---|---|
-| **Target** | `is_great_deal` — `True` if `discount_pct >= 50` AND `rating` is in `["Very Positive", "Mostly Positive", "Overwhelmingly Positive"]` |
-| **Features** | genre (encoded), original price, review count, day of week |
-| **Model** | `RandomForestClassifier` |
-| **Evaluation** | Accuracy score + confusion matrix |
+Not required for the deal advisor. If you explore data in `analysis/notebook.ipynb`:
 
-Blocked until `genres`, `rating`, and `review_count` are scraped and stored.
+- **Histogram** — discount % distribution (works with current schema)
+- **Heatmap** — average discount by day of week (`scraped_at`)
+- **Bar chart** — top discounted genres (needs optional `genres` field)
+- **Scatter plot** — rating vs discount % (needs optional `rating` field)
 
 ---
 
@@ -219,7 +259,8 @@ Blocked until `genres`, `rating`, and `review_count` are scraped and stored.
 
 - Python 3.14+
 - MongoDB Atlas account (free)
-- Internet connection for scraping and DB access
+- Google Gemini API key (Phase 8)
+- Internet connection for scraping, DB access, and Gemini
 
 ---
 

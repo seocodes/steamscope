@@ -2,7 +2,7 @@
 
 Simple steps to build the project, broken down until each step uses basic Python features.
 
-**Progress:** Phases 1–3 and 5 are implemented. **Next:** Phase 4 (pagination), then extend the scraper for `genres` / `rating` / `review_count` before Phases 7–8.
+**Progress:** Phases 1–3 and 5 are implemented. **Next:** Phase 4 (pagination), then Phase 6 (data collection), then Phase 7 (MongoDB deal context) and Phase 8 (deal advisor website + Gemini).
 
 ---
 
@@ -39,7 +39,7 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 **Implemented now:** `title`, `original_price`, `discounted_price`, `discount_pct`, `url`, `scraped_at`
 
-**Still to add (before Phases 7–8):**
+**Optional enrichment (not required for deal advisor):**
 - `genres` — list of strings
 - `rating` — string
 - `review_count` — int
@@ -146,66 +146,80 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 ---
 
-## Phase 7 — Analysis & Visualization
+## Phase 7 — MongoDB Analysis for Deal Context
 
-**Prerequisite:** `genres` and `rating` in MongoDB (Step 3 extension) for genre bar chart and rating scatter.
+**Prerequisite:** Phase 6 — at least a few days of scrape history per game (current schema is enough).
 
-### Step 11: Query Data with Pandas
-**Goal:** Load MongoDB data into DataFrame
+### Step 11: Query Deals by Title
+**Goal:** Load historical scrape rows for one game from MongoDB
 
 **Python features:**
-- `pandas.DataFrame(list(collection.find()))`
-- `pd.to_datetime()` — convert date strings
-- `.drop('_id', axis=1)` — remove MongoDB's internal ID
+- `collection.find({"title": title})` — exact match (or regex for fuzzy match later)
+- `collection.distinct("title")` — list games for the web dropdown
+- Sort by `scraped_at` — `sort("scraped_at", -1)`
 
-**Test:** `print(df.head())`, `print(df.shape)`
+**Files:** extend `application/db.py` with `query_deals_by_title()`, `list_game_titles()`
+
+**Test:** Print row count and last 3 snapshots for a known title
 
 ---
 
-### Step 12: Create Charts
-**Goal:** Visualize the data
+### Step 12: Build Deal Context JSON
+**Goal:** Aggregate history into a compact dict for the AI advisor
 
 **Python features:**
-- `matplotlib.pyplot` — `plt.figure()`, `plt.bar()`, `plt.show()`
-- `seaborn` — `sns.heatmap()`, `sns.histplot()`, `sns.scatterplot()`
-- `.groupby()` — aggregate by genre
-- `.value_counts()` — count occurrences
-- `.corr()` — correlation between numeric columns
+- `min()` / `max()` / `sum() / len()` — price and discount stats
+- List slicing — last 5 `recent_snapshots`
+- `json.dumps()` — pretty-print for CLI validation
+- Functions — `def build_deal_context(title, proposed_price):` in `application/context.py`
 
-**Charts to build:**
-1. Bar chart — top discounted genres (needs `genres`; use `.explode('genres')` then `.groupby(...)['discount_pct'].mean()`)
-2. Histogram — discount % distribution (works with current schema)
-3. Heatmap — discount by day of week (`df['scraped_at'].dt.day_name()`)
-4. Scatter plot — rating vs discount % (needs `rating`)
+**Context shape:** `game`, `proposed_discounted_price`, `history` (scrape_count, date range, min/max/avg prices, recent_snapshots)
+
+**Test:** `uv run python scripts/print_context.py "Game Title"` — prints valid JSON
+
+**Optional (not on critical path):** exploratory charts in `analysis/notebook.ipynb` with pandas/matplotlib (histogram of discount %, heatmap by day of week)
 
 ---
 
-## Phase 8 — Machine Learning
+## Phase 8 — Deal Advisor Website + Gemini
 
-**Prerequisite:** `genres`, `rating`, `review_count` in MongoDB.
+**Prerequisite:** Phase 7 context builder works; `GEMINI_API_KEY` in `.env`.
 
-### Step 13: Prepare Data for ML
-**Goal:** Transform data so a model can use it
+### Step 13: Gemini Deal Analysis
+**Goal:** Send context JSON to Google Gemini and get a structured verdict
 
 **Python features:**
-- Boolean masking: `df['is_great_deal'] = (df['discount_pct'] >= 50) & (df['rating'].isin(['Very Positive', 'Mostly Positive', 'Overwhelmingly Positive']))`
-- `pd.get_dummies()` — convert categories (genre) to numbers
-- `.dropna()` — remove rows with missing data
-- `train_test_split` — split into training and test sets
+- `os.getenv("GEMINI_API_KEY")` — load API key from `.env`
+- `google-genai` client — call a free-tier flash model
+- Prompt engineering — compare `proposed_discounted_price` to historical lows/averages only
+- Parse JSON response — `{ "verdict": "good|fair|wait", "summary": "..." }`
+
+**Files:** `application/gemini_advisor.py` — `analyze_deal(context) -> dict`
+
+**Guardrails:** If no history for title, return a clear error without calling Gemini
+
+**Test:** Call advisor with sample context; print verdict and summary
 
 ---
 
-### Step 14: Train Model
-**Goal:** Predict if a deal is "great"
+### Step 14: Simple Web UI
+**Goal:** Player picks a game, enters a proposed sale price, sees if the discount is good
 
 **Python features:**
-- `RandomForestClassifier()` — create model
-- `.fit(X_train, y_train)` — train on data
-- `.predict(X_test)` — make predictions
-- `accuracy_score()` — measure performance
-- `confusion_matrix()` — see false positives/negatives
+- FastAPI (or Flask) — `GET /`, `GET /api/games`, `POST /api/advise`
+- Jinja2 templates — game dropdown + price input + verdict display
+- `uvicorn` — run local server
 
-**Test:** Print accuracy score, verify it's reasonable (>50%)
+**Files:**
+- `web/app.py` — routes and wiring
+- `web/templates/index.html` — form + result area
+
+**User flow:**
+1. Select game from dropdown (titles from MongoDB)
+2. Enter proposed discounted price
+3. Backend builds context → calls Gemini → shows verdict + short explanation
+
+**Test:** Open `http://127.0.0.1:8000`, submit one game, verify explanation references your historical data
 
 ---
 
@@ -222,11 +236,12 @@ Simple steps to build the project, broken down until each step uses basic Python
 - [x] Create scheduler
 - [x] Build main.py entry point
 - [ ] Collect data for 3-5 days
-- [ ] Load data with pandas
-- [ ] Create 4 visualizations
-- [ ] Prepare ML features
-- [ ] Train RandomForest model
-- [ ] Evaluate model accuracy
+- [ ] Query deals by title in MongoDB
+- [ ] Build deal context JSON (`application/context.py`)
+- [ ] Integrate Gemini advisor (`application/gemini_advisor.py`)
+- [ ] Deal advisor web UI (`web/app.py` + template)
+- [ ] (Optional) Extract genres, rating, review_count
+- [ ] (Optional) Exploratory charts in notebook
 
 ---
 
@@ -234,8 +249,13 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 | File | Purpose |
 |------|---------|
-| `application/scraper.py` | Steps 1-6, genre/rating extension |
-| `application/db.py` | Steps 4-5 |
-| `application/scheduler.py` | Steps 7-8 |
+| `application/scraper.py` | Steps 1-6, optional genre/rating extension |
+| `application/db.py` | Steps 4-5, Step 11 queries |
+| `application/scheduler.py` | Steps 7-8 (scheduler/logging) |
+| `application/context.py` | Step 12 — deal context JSON |
+| `application/gemini_advisor.py` | Step 13 — Gemini verdict |
 | `main.py` | Step 9 |
-| `analysis/notebook.ipynb` | Steps 11-14 |
+| `web/app.py` | Step 14 — deal advisor site |
+| `web/templates/index.html` | Step 14 — player form |
+| `scripts/print_context.py` | Step 12 — CLI test for context JSON |
+| `analysis/notebook.ipynb` | Optional exploratory charts only |
