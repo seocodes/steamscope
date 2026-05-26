@@ -1,7 +1,5 @@
 # Guias de aprendizado — steamscope
 
-Estes arquivos são **só para você**. Estão no `.gitignore` e **não vão para o GitHub**.
-
 Leia nesta ordem:
 
 | # | Arquivo | O que você vai entender |
