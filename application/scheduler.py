@@ -12,9 +12,7 @@ except ModuleNotFoundError:
     from db import insert_deals
     from scraper import fetch_page, scrape_deals
 
-
 DEFAULT_SCRAPE_TIME = "06:00"
-
 
 def configure_logging():
     logs_dir = Path("logs")
@@ -54,6 +52,7 @@ def validate_time_str(time_str):
 def run_scraper_job(logger):
     logger.info("Starting scheduled scraper run...")
 
+    # MUDAR AQUI APOS A MUDANCA DE PAGINACAO ?????
     page = fetch_page(max_retries=3, timeout=10)
     if page is None:
         logger.error("Scraper run aborted: failed to fetch Steam page.")

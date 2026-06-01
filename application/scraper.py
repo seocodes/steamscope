@@ -70,7 +70,7 @@ def validate_game_record(record):
     # All checks passed!
     return True, ""
 
-def fetch_page(max_retries=3, timeout=10):
+def fetch_page(page=1, max_retries=3, timeout=10):
     """
     Fetch Steam specials page with safety features.
     
@@ -86,7 +86,10 @@ def fetch_page(max_retries=3, timeout=10):
     - max_retries: Network blips happen; one failure shouldn't kill the whole run
     - User-Agent: Steam blocks requests that look like bots; this looks like a real browser
     """
-    url = "https://store.steampowered.com/search/?specials=1"
+
+    base_url = "https://store.steampowered.com/search/?specials=1"
+    url = f"https://store.steampowered.com/search/?specials={page}" if page > 1 else base_url
+    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
     }
@@ -122,7 +125,7 @@ def fetch_page(max_retries=3, timeout=10):
     return None
 
 
-def scrape_deals(page, rate_limit_delay=1):
+def scrape_deals(page, rate_limit_delay=1, seen_urls=None):
     """
     Scrape all deals from page with deduplication.
     
@@ -140,8 +143,10 @@ def scrape_deals(page, rate_limit_delay=1):
     """
     deals = page.find_all("a", class_="search_result_row")
     logger.info(f"Found {len(deals)} game entries on page")
-    
-    seen_urls = set()  # Track URLs we've already processed in this run
+
+    if seen_urls is None:
+        seen_urls = set()  # Track URLs we've already processed in this run
+        
     valid_records = []
     
     for i, deal in enumerate(deals):
@@ -259,22 +264,31 @@ def parse_game(element):
 
 if __name__ == "__main__":
     logger.info("Starting Steam scraper...")
+    total_pages = 3
+    all_records = []
+    seen_urls = set()  # Track URLs we've already processed in this run    
+
+    for page in range(1, total_pages + 1):
+        page = fetch_page(page, max_retries=3, timeout=10)
+        if page is None:
+            logger.warning(f"Failed to fetch page {page}. Skipping.")
+            continue
     
-    page = fetch_page(max_retries=3, timeout=10)
+        valid_records = scrape_deals(page, rate_limit_delay=1, seen_urls=seen_urls)
+        all_records.extend(valid_records)
+        time.sleep(1)
+        
+        if not valid_records:
+            logger.warning(f"No valid records scraped from page {page}.")
+            continue
     
-    if page is None:
-        logger.error("Failed to fetch page. Exiting.")
-        exit(1)
-    
-    valid_records = scrape_deals(page, rate_limit_delay=1)
-    
-    if not valid_records:
+    if not all_records:
         logger.warning("No valid records scraped.")
         exit(0)
     
-    inserted_count = insert_deals(valid_records)
+    inserted_count = insert_deals(all_records)
     logger.info(f"Inserted {inserted_count} records into MongoDB")
 
     logger.info("=== Inserted Records ===")
-    for record in valid_records:
+    for record in all_records:
         print(f"  {record['title']}: {record['discount_pct']}% off (${record['discounted_price']})")

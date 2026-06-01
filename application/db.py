@@ -7,7 +7,6 @@ from pymongo.server_api import ServerApi
 
 load_dotenv()
 
-
 def get_mongo_uri():
     uri = os.getenv("MONGO_URI")
     if not uri:
@@ -16,8 +15,7 @@ def get_mongo_uri():
 
 
 def create_client():
-    return MongoClient(get_mongo_uri(), server_api=ServerApi("1"))
-
+    return MongoClient(get_mongo_uri(), server_api=ServerApi("1")) 
 
 def ping_mongodb():
     client = create_client()
