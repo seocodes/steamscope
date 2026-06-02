@@ -2,7 +2,7 @@
 
 Simple steps to build the project, broken down until each step uses basic Python features.
 
-**Progress:** Phases 1–3 and 5 are implemented. **Next:** Phase 4 (pagination), then Phase 6 (data collection), then Phase 7 (MongoDB deal context) and Phase 8 (deal advisor website + Gemini).
+**Progress:** Phases 1–5 and 7 are implemented; the Gemini advisor (Phase 8) is implemented. **Next:** Phase 6 (data collection) and the Phase 8 web UI.
 
 ---
 
@@ -81,9 +81,9 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 ---
 
-## Phase 4 — Pagination
+## Phase 4 — Pagination ✓
 
-### Step 6: Scrape Multiple Pages
+### Step 6: Scrape Multiple Pages ✓
 **Goal:** Get 100-125 games per run (4-5 pages)
 
 **Python features:**
@@ -146,11 +146,11 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 ---
 
-## Phase 7 — MongoDB Analysis for Deal Context
+## Phase 7 — MongoDB Analysis for Deal Context ✓
 
 **Prerequisite:** Phase 6 — at least a few days of scrape history per game (current schema is enough).
 
-### Step 11: Query Deals by Title
+### Step 11: Query Deals by Title ✓
 **Goal:** Load historical scrape rows for one game from MongoDB
 
 **Python features:**
@@ -158,13 +158,13 @@ Simple steps to build the project, broken down until each step uses basic Python
 - `collection.distinct("title")` — list games for the web dropdown
 - Sort by `scraped_at` — `sort("scraped_at", -1)`
 
-**Files:** extend `application/db.py` with `query_deals_by_title()`, `list_game_titles()`
+**Files:** `application/db.py` includes `query_deals_by_title()` and `list_games_titles()`
 
 **Test:** Print row count and last 3 snapshots for a known title
 
 ---
 
-### Step 12: Build Deal Context JSON
+### Step 12: Build Deal Context JSON ✓
 **Goal:** Aggregate history into a compact dict for the AI advisor
 
 **Python features:**
@@ -175,13 +175,13 @@ Simple steps to build the project, broken down until each step uses basic Python
 
 **Context shape:** `game`, `proposed_discounted_price`, `history` (scrape_count, date range, min/max/avg prices, recent_snapshots)
 
-**Test:** `uv run python scripts/print_context.py "Game Title"` — prints valid JSON
+**Test:** `uv run python application/test_context.py` — builds context and calls Gemini
 
 **Optional (not on critical path):** exploratory charts in `analysis/notebook.ipynb` with pandas/matplotlib (histogram of discount %, heatmap by day of week)
 
 ---
 
-## Phase 8 — Deal Advisor Website + Gemini
+## Phase 8 — Deal Advisor Website + Gemini (in progress)
 
 **Prerequisite:** Phase 7 context builder works; `GEMINI_API_KEY` in `.env`.
 
@@ -194,11 +194,13 @@ Simple steps to build the project, broken down until each step uses basic Python
 - Prompt engineering — compare `proposed_discounted_price` to historical lows/averages only
 - Parse JSON response — `{ "verdict": "good|fair|wait", "summary": "..." }`
 
-**Files:** `application/gemini_advisor.py` — `analyze_deal(context) -> dict`
+**Files:** `application/gemini_advisor.py` — `analyze_deal(context) -> str`
+
+**Status:** Implemented in `application/gemini_advisor.py` (returns text; JSON parsing pending).
 
 **Guardrails:** If no history for title, return a clear error without calling Gemini
 
-**Test:** Call advisor with sample context; print verdict and summary
+**Test:** Call advisor with sample context; print response text
 
 ---
 
@@ -231,14 +233,14 @@ Simple steps to build the project, broken down until each step uses basic Python
 - [ ] Extract genres, rating, review_count
 - [x] Connect to MongoDB
 - [x] Insert data into collection
-- [ ] Scrape multiple pages
+- [x] Scrape multiple pages
 - [x] Add logging
 - [x] Create scheduler
 - [x] Build main.py entry point
 - [ ] Collect data for 3-5 days
-- [ ] Query deals by title in MongoDB
-- [ ] Build deal context JSON (`application/context.py`)
-- [ ] Integrate Gemini advisor (`application/gemini_advisor.py`)
+- [x] Query deals by title in MongoDB
+- [x] Build deal context JSON (`application/context.py`)
+- [x] Integrate Gemini advisor (`application/gemini_advisor.py`) — text response only
 - [ ] Deal advisor web UI (`web/app.py` + template)
 - [ ] (Optional) Extract genres, rating, review_count
 - [ ] (Optional) Exploratory charts in notebook
@@ -254,8 +256,9 @@ Simple steps to build the project, broken down until each step uses basic Python
 | `application/scheduler.py` | Steps 7-8 (scheduler/logging) |
 | `application/context.py` | Step 12 — deal context JSON |
 | `application/gemini_advisor.py` | Step 13 — Gemini verdict |
+| `application/test_context.py` | Steps 12–13 — CLI smoke test |
 | `main.py` | Step 9 |
 | `web/app.py` | Step 14 — deal advisor site |
 | `web/templates/index.html` | Step 14 — player form |
-| `scripts/print_context.py` | Step 12 — CLI test for context JSON |
+| `scripts/print_context.py` | (planned) CLI test for context JSON |
 | `analysis/notebook.ipynb` | Optional exploratory charts only |

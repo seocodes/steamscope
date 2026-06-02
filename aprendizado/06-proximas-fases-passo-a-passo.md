@@ -4,7 +4,9 @@ Este guia segue o [PLANNING.md](../PLANNING.md) e o [README.md](../README.md), m
 
 ---
 
-## Fase 4 — Paginação (sua próxima tarefa de código)
+## Fase 4 — Paginação (concluída)
+
+**Status:** Implementada no `scraper.py` com loop de páginas.
 
 ### Objetivo
 
@@ -53,7 +55,7 @@ Ter **histórico** de vários dias para o mesmo jogo.
 
 ### O que fazer
 
-1. Termine a Fase 4.
+1. Fase 4 já concluída; siga para a coleta.
 2. Configure `.env` com `SCRAPE_TIME` e `RUN_ON_STARTUP` como preferir.
 3. Rode `uv run python main.py` e deixe o PC ligado (ou rode manualmente 1x por dia durante 3–5 dias).
 4. No Atlas, filtre por um `title` e veja vários `scraped_at` diferentes.
@@ -64,13 +66,15 @@ Ter **histórico** de vários dias para o mesmo jogo.
 
 ## Fase 7 — Contexto JSON (você escreve o back-end)
 
+**Status:** Já implementado em `application/db.py` e `application/context.py`.
+
 ### Arquivos novos
 
 - Funções em `application/db.py`
 - `application/context.py`
 - `scripts/print_context.py` (teste rápido)
 
-### Passo 7.1 — `list_game_titles()`
+### Passo 7.1 — `list_games_titles()`
 
 ```python
 # Ideia: collection.distinct("title")
@@ -122,7 +126,9 @@ Título com aspas ou nome ligeiramente diferente — copie o `title` **exato** d
 
 Divida em **duas metades**: API Python primeiro, HTML depois (pode pedir ajuda no HTML).
 
-### Parte A — `gemini_advisor.py` (você)
+### Parte A — `gemini_advisor.py` (concluído)
+
+**Status:** Já implementado em `application/gemini_advisor.py` (retorna texto).
 
 1. `uv add google-genai` (quando for implementar)
 2. Ler `GEMINI_API_KEY` do `.env`
@@ -167,11 +173,11 @@ uv run uvicorn web.app:app --reload
 
 ## Checklist geral (marque na ordem)
 
-- [X] Fase 4 — paginação funcionando
+- [x] Fase 4 — paginação funcionando
 - [ ] Fase 6 — 3+ dias de dados no Atlas
-- [ ] `list_game_titles` e `query_deals_by_title`
-- [ ] `build_deal_context` + script de teste
-- [ ] `analyze_deal` com Gemini
+- [x] `list_games_titles` e `query_deals_by_title`
+- [x] `build_deal_context` + teste (`application/test_context.py`)
+- [x] `analyze_deal` com Gemini (retorna texto)
 - [ ] API FastAPI com 3 rotas
 - [ ] Página HTML mínima funcionando
 

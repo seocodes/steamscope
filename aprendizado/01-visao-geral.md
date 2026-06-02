@@ -24,11 +24,11 @@ Steam (site) → extrair dados → validar → salvar no banco → (depois) anal
 | 1 — Setup | Feito | Pastas, dependências, `.env` |
 | 2 — Scraper (1 página) | Feito | Baixa e interpreta **uma** página de ofertas |
 | 3 — MongoDB | Feito | Salva os jogos no Atlas |
-| 4 — Paginação | **Próximo** | Várias páginas por execução (~100 jogos) |
+| 4 — Paginação | Feito | Várias páginas por execução (~100 jogos) |
 | 5 — Agendador | Feito | Roda sozinho todo dia no horário que você configurar |
 | 6 — Coleta de dados | Não começou | Deixar rodando dias para ter histórico |
-| 7 — Contexto JSON | Não começou | Resumir histórico de um jogo para a IA |
-| 8 — Site + Gemini | Não começou | Formulário: jogo + preço → veredito |
+| 7 — Contexto JSON | Feito | Resumir histórico de um jogo para a IA |
+| 8 — Site + Gemini | Em andamento | Gemini pronto; site pendente |
 
 ---
 
@@ -40,7 +40,9 @@ steamscope/
 ├── application/
 │   ├── scraper.py          → Vai na Steam, extrai jogos, valida
 │   ├── db.py               → Fala com o MongoDB (salvar / depois consultar)
-│   └── scheduler.py        → Combina scraper + banco + horário fixo
+│   ├── scheduler.py        → Combina scraper + banco + horário fixo
+│   ├── context.py          → Monta o JSON de contexto do jogo
+│   └── gemini_advisor.py   → Chama o Gemini e devolve o veredito
 ├── .env                    → Senhas e URLs (NUNCA commitar)
 ├── pyproject.toml          → Lista de bibliotecas do projeto
 ├── PLANNING.md             → Roteiro técnico (inglês, para o projeto)

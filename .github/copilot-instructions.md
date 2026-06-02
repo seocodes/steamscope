@@ -13,11 +13,11 @@ See also [AGENTS.md](../AGENTS.md) and [PLANNING.md](../PLANNING.md).
 | 1 — Setup | Done |
 | 2 — Scraper (single page) | Done |
 | 3 — MongoDB | Done |
-| 4 — Pagination | **Next** |
+| 4 — Pagination | Done |
 | 5 — Scheduler + logging | Done |
 | 6 — Data collection | Not started |
-| 7 — MongoDB analysis (deal context) | Not started |
-| 8 — Deal advisor + Gemini | Not started |
+| 7 — MongoDB analysis (deal context) | Done |
+| 8 — Deal advisor + Gemini | In progress (Gemini advisor done; web UI pending) |
 
 **Do not re-implement** unless fixing bugs: `fetch_page`, `parse_game`, `scrape_deals`, `validate_game_record`, `insert_deals`, `start_scheduler`.
 
@@ -94,11 +94,11 @@ The project is built in **8 phases**:
 1. **Phase 1**: Project setup ✓
 2. **Phase 2**: Basic scraper (single page, validation, DB insert) ✓
 3. **Phase 3**: MongoDB integration ✓
-4. **Phase 4**: Pagination (4–5 pages per run, ~100–125 games) — **next**
+4. **Phase 4**: Pagination (4–5 pages per run, ~100–125 games) ✓
 5. **Phase 5**: Scheduler + logging (daily `SCRAPE_TIME`, `logs/scraper.log`) ✓
 6. **Phase 6**: Data collection (let it run 3–5 days)
-7. **Phase 7**: MongoDB queries + deal context JSON builder
-8. **Phase 8**: Deal advisor website + Google Gemini API
+7. **Phase 7**: MongoDB queries + deal context JSON builder ✓
+8. **Phase 8**: Deal advisor website + Google Gemini API (Gemini advisor implemented; web UI pending)
 
 ### Data Flow
 ```
@@ -150,7 +150,7 @@ Steam Web Page → requests → BeautifulSoup (parse HTML)
 ### Dependencies Management
 - **Production**: `pyproject.toml` `[project] dependencies`
   - `requests`, `beautifulsoup4`, `pymongo`, `python-dotenv`, `schedule`
-- **Production (Phase 8 — add when implementing)**: `fastapi`, `uvicorn`, `google-genai`, `jinja2`
+- **Production (Phase 8 — add when implementing)**: `fastapi`, `uvicorn`, `jinja2` (Gemini client already added)
 - **Dev**: `[dependency-groups] dev`
   - `jupyter`, `pandas`, `matplotlib`, `seaborn` (optional exploration)
 - Install all: `uv sync`

@@ -52,8 +52,9 @@ steamscope/
 │   ├── scraper.py             # Fetches and parses Steam deals page
 │   ├── db.py                  # MongoDB connection, insert, and queries
 │   ├── scheduler.py           # Daily scheduled runs + logging
-│   ├── context.py             # (planned) Build deal context JSON
-│   └── gemini_advisor.py      # (planned) Call Gemini for verdict
+│   ├── context.py             # Build deal context JSON
+│   ├── gemini_advisor.py      # Call Gemini for verdict
+│   └── test_context.py        # Smoke test: context + Gemini
 │
 ├── web/                       # (planned) Deal advisor website
 │   ├── app.py                 # FastAPI routes
@@ -111,11 +112,11 @@ These fields improve AI context but are **not required** for the deal advisor:
 - [x] Phase 1 — Project setup and folder structure
 - [x] Phase 2 — Steam scraper (single page, validation, MongoDB insert)
 - [x] Phase 3 — MongoDB integration (`db.py`)
-- [ ] Phase 4 — Pagination (scrape 4–5 pages per run, ~100–125 games)
+- [x] Phase 4 — Pagination (scrape 4–5 pages per run, ~100–125 games)
 - [x] Phase 5 — Scheduler + logging (`scheduler.py` + `main.py`)
 - [ ] Phase 6 — Data collection period *(let it run for 3–5 days)*
-- [ ] Phase 7 — MongoDB deal context builder (`context.py`, db queries)
-- [ ] Phase 8 — Deal advisor website + Gemini (`web/`, `gemini_advisor.py`)
+- [x] Phase 7 — MongoDB deal context builder (`context.py`, db queries)
+- [ ] Phase 8 — Deal advisor website + Gemini (Gemini advisor implemented; web UI pending)
 
 ---
 

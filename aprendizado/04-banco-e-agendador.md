@@ -52,11 +52,11 @@ uv run python application/db.py
 
 Deve imprimir que o ping funcionou.
 
-### O que você vai **adicionar** nas Fases 7–8
+### O que já foi **adicionado** nas Fases 7–8
 
 Funções novas no **mesmo** arquivo, por exemplo:
 
-- `list_game_titles()` — lista nomes únicos para o dropdown do site
+- `list_games_titles()` — lista nomes únicos para o dropdown do site
 - `query_deals_by_title(title)` — histórico de um jogo
 
 Padrão: mesma estrutura — abre client, usa collection, fecha no `finally`.
