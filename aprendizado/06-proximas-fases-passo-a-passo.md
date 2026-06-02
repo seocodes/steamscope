@@ -167,7 +167,7 @@ uv run uvicorn web.app:app --reload
 
 ## Checklist geral (marque na ordem)
 
-- [ ] Fase 4 — paginação funcionando
+- [X] Fase 4 — paginação funcionando
 - [ ] Fase 6 — 3+ dias de dados no Atlas
 - [ ] `list_game_titles` e `query_deals_by_title`
 - [ ] `build_deal_context` + script de teste
