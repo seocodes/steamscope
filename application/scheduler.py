@@ -52,18 +52,29 @@ def validate_time_str(time_str):
 def run_scraper_job(logger):
     logger.info("Starting scheduled scraper run...")
 
-    # MUDAR AQUI APOS A MUDANCA DE PAGINACAO ?????
-    page = fetch_page(max_retries=3, timeout=10)
-    if page is None:
-        logger.error("Scraper run aborted: failed to fetch Steam page.")
-        return
+    total_pages = 3
+    all_records = []
+    seen_urls = set()  
 
-    records = scrape_deals(page, rate_limit_delay=1)
-    if not records:
-        logger.warning("Scraper run finished with no valid records.")
-        return
-
-    inserted_count = insert_deals(records)
+    for page in range(1, total_pages + 1):
+        page = fetch_page(page, max_retries=3, timeout=10)
+        if page is None:
+            logger.warning(f"Failed to fetch page {page}. Skipping.")
+            continue
+    
+        valid_records = scrape_deals(page, rate_limit_delay=1, seen_urls=seen_urls)
+        all_records.extend(valid_records)
+        time.sleep(1)
+        
+        if not valid_records:
+            logger.warning(f"No valid records scraped from page {page}.")
+            continue
+    
+    if not all_records:
+        logger.warning("No valid records scraped.")
+        exit(0)
+    
+    inserted_count = insert_deals(all_records)
     logger.info("Scraper run completed. Inserted %s records.", inserted_count)
 
 

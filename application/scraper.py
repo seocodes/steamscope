@@ -70,7 +70,7 @@ def validate_game_record(record):
     # All checks passed!
     return True, ""
 
-def fetch_page(page=1, max_retries=3, timeout=10):
+def fetch_page(page, max_retries=3, timeout=10):
     """
     Fetch Steam specials page with safety features.
     
@@ -88,7 +88,7 @@ def fetch_page(page=1, max_retries=3, timeout=10):
     """
 
     base_url = "https://store.steampowered.com/search/?specials=1"
-    url = f"https://store.steampowered.com/search/?specials={page}" if page > 1 else base_url
+    url = f"{base_url}&page={page}" if page > 1 else base_url
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
@@ -96,7 +96,7 @@ def fetch_page(page=1, max_retries=3, timeout=10):
     
     for attempt in range(max_retries):
         try:
-            logger.info(f"Fetching Steam page (attempt {attempt + 1}/{max_retries})...")
+            logger.info(f"Fetching Steam page {page} (attempt {attempt + 1}/{max_retries})...")
             response = requests.get(url, headers=headers, timeout=timeout)
             response.raise_for_status()  # Raise exception if status code is 4xx or 5xx
             
@@ -264,17 +264,17 @@ def parse_game(element):
 
 if __name__ == "__main__":
     logger.info("Starting Steam scraper...")
-    total_pages = 3
+    total_pages = 10
     all_records = []
     seen_urls = set()  # Track URLs we've already processed in this run    
 
-    for page in range(1, total_pages + 1):
-        page = fetch_page(page, max_retries=3, timeout=10)
-        if page is None:
+    for page in range(6, total_pages + 1):
+        scrapped_page = fetch_page(page, max_retries=3, timeout=10)
+        if scrapped_page is None:
             logger.warning(f"Failed to fetch page {page}. Skipping.")
             continue
     
-        valid_records = scrape_deals(page, rate_limit_delay=1, seen_urls=seen_urls)
+        valid_records = scrape_deals(scrapped_page, rate_limit_delay=1, seen_urls=seen_urls)
         all_records.extend(valid_records)
         time.sleep(1)
         
