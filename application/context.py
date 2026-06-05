@@ -7,7 +7,7 @@ except ModuleNotFoundError:
 def _ensure_float_price(value, field_name, title):
     try:
         return float(value)
-    except (TypeError, ValueError): # Capturar somente o erro que esperamos
+    except (TypeError, ValueError):
         raise ValueError(f"Invalid {field_name} for title '{title}': {value}")
 
 def _average(values):

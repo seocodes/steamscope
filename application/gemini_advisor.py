@@ -9,7 +9,7 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Formata pois, independente de como outros arquivos enviarem, o contexto sempre será tratado como JSON.
+
 def format_context_to_json(context):
     if isinstance(context, str):
         return context
@@ -19,7 +19,7 @@ def validate_api_key():
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY is not set in the environment.")
 
-# Isolado para reutilizacao e testabilidade futura (nao exige conexao com a API do Gemini)
+
 def build_prompt(context_json):
     prompt = f"""
     You are SteamScope, a Steam deal analyst.

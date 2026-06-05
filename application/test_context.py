@@ -7,7 +7,7 @@ def build_context(title, proposed_price):
     context = build_deal_context(title, proposed_price)
     return context
 
-# Funcoes de leitura/validacao sempre devem ou retornar um erro claro, ou o valor validado.
+
 def read_proposed_price():
     raw_price = input("Enter a proposed price: ").strip().replace(",", ".")
     try:
