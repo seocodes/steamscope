@@ -12,7 +12,7 @@ class game(BaseModel):
     title: str
     price: float
     
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory="web/templates")
 
 app = FastAPI()
 
