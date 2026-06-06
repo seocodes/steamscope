@@ -8,7 +8,6 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap"
     />
-    <script src="script.js"></script>
     <style>
       :root {
         color-scheme: dark;
@@ -93,11 +92,11 @@
   <body>
     <main>
       <h1>Steam Discount Analyzer</h1>
-      <form method="post" action="/api/advise">
+      <form id="advisor-form" method="post" action="/api/advise">
         <div>
           <label for="title">Game Title</label>
           <select id="title" name="title" required>
-              <!--AQUI TO USANDO O JINJA2-->
+              <!--AQUI TO USANDO O JINJA2, RODA NO SERVIDOR E O HTML JA LOADA COM TODOS OS JOGOS-->
             {% for game in games %}
             <option value="{{ game }}">{{ game }}</option>
             {% endfor %}
@@ -124,5 +123,6 @@
         {{ result | default("") }}
       </section>
     </main>
+    <script src="/static/script.js"></script>
   </body>
 </html>
