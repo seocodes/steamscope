@@ -1,276 +1,219 @@
-# steamscope 🎮
+# SteamScope
 
-> A Steam deals tracker that scrapes, stores, and analyzes game discounts over time.
+SteamScope is a Python project that tracks Steam discounts over time and uses that history to evaluate whether a proposed sale price is actually worth it.
 
-Built as a personal learning project to practice web scraping, NoSQL databases, data analysis, and AI-assisted recommendations — all with Python.
+The project is being built as a practical learning exercise around web scraping, MongoDB, scheduled jobs, small data summaries, FastAPI, and AI-assisted recommendations.
 
-For AI-assisted development, see [AGENTS.md](AGENTS.md) and [.github/copilot-instructions.md](.github/copilot-instructions.md).
+## Current Status
 
----
+The core MVP is in progress and already includes:
 
-## 🎯 Goal
+- Steam sale scraping with validation and retry handling.
+- MongoDB Atlas persistence for historical deal snapshots.
+- Daily scheduling with configurable runtime and log output.
+- Historical context generation for a selected game.
+- Gemini-based deal analysis from compact JSON context.
+- A simple FastAPI web interface for selecting a game and submitting a proposed price.
 
-Answer the question:
+The main remaining work is to keep collecting enough historical data, refine the web experience, and improve response formatting/error handling in the advisor flow.
 
-> *"Is this discount actually good for this game?"*
+## Goal
 
-The final deliverable is a **simple website** where you pick a game, enter a proposed sale price, and get a plain-language verdict — powered by **historical data in MongoDB** and **Google Gemini** analyzing a compact JSON summary of that game's past deals.
+SteamScope is designed to answer a simple question:
 
----
+> Is this discount actually good for this game?
 
-## 🧰 Tech Stack
+The app compares a proposed discounted price with previously scraped Steam sale data and returns a concise verdict based on the game's own price history.
 
-| Layer         | Tool                      | Purpose                                      |
-|---------------|---------------------------|----------------------------------------------|
-| Scraping      | `requests` + `bs4`        | Fetch and parse Steam HTML                   |
-| Database      | MongoDB Atlas (free tier) | Store and persist scraped data               |
-| Scheduling    | `schedule`                | Daily automated scraper runs                 |
-| Analysis      | `pymongo` + Python        | Query history, build deal context JSON       |
-| Web           | FastAPI + HTML templates  | Game picker, price input, verdict display    |
-| AI            | Google Gemini API         | Judge if a proposed discount is good         |
-| Notebook      | `jupyter` (optional)      | Exploratory charts only                      |
+## Tech Stack
 
----
+| Layer | Tooling | Purpose |
+| --- | --- | --- |
+| Scraping | `requests`, `beautifulsoup4` | Fetch and parse Steam sale pages |
+| Database | MongoDB Atlas, `pymongo` | Store deal snapshots over time |
+| Scheduling | `schedule` | Run the scraper daily |
+| Backend | FastAPI, Jinja2 | Serve the local advisor UI and API |
+| AI | Google Gemini API | Evaluate proposed prices against historical context |
+| Environment | `python-dotenv`, `uv` | Manage configuration and dependencies |
+| Analysis | Jupyter, pandas, matplotlib, seaborn | Optional exploratory analysis |
 
-## 📁 Project Structure
+## Project Structure
 
-```
+```text
 steamscope/
-│
-├── main.py                    # Entry point — runs the scheduler
+├── main.py                    # Scheduler entry point
 ├── pyproject.toml             # Project metadata and dependencies
-├── uv.lock                    # Lockfile — guarantees reproducible installs
-├── .python-version            # Pinned Python version for uv
-├── .env                       # Secrets — NEVER commit this
-├── .env.example               # Template for .env — safe to commit
-├── AGENTS.md                  # Short agent status and pointers
-├── .gitignore
-├── LICENSE
+├── uv.lock                    # Reproducible dependency lockfile
+├── .python-version            # Python version used by uv
+├── .env.example               # Environment variable template
 ├── README.md
+├── PLANNING.md                # Development plan and phase notes
 │
-├── application/               # Core source package
-│   ├── scraper.py             # Fetches and parses Steam deals page
-│   ├── db.py                  # MongoDB connection, insert, and queries
-│   ├── scheduler.py           # Daily scheduled runs + logging
-│   ├── context.py             # Build deal context JSON
-│   ├── gemini_advisor.py      # Call Gemini for verdict
-│   └── test_context.py        # Smoke test: context + Gemini
+├── application/
+│   ├── db.py                  # MongoDB connection and queries
+│   ├── scraper.py             # Steam scraping and record parsing
+│   ├── scheduler.py           # Daily scraper scheduling and logging
+│   ├── context.py             # Historical deal context builder
+│   ├── gemini_advisor.py      # Gemini prompt and response parsing
+│   └── test_context.py        # Manual smoke test for context/advisor flow
 │
-├── web/                       # (planned) Deal advisor website
-│   ├── app.py                 # FastAPI routes
+├── web/
+│   ├── app.py                 # FastAPI app and advisor endpoint
 │   ├── templates/
-│   │   └── index.html         # Game select + price form + verdict
-│   └── static/                # Optional minimal CSS
+│   │   └── index.html         # Game selector and price form
+│   └── static/
+│       └── script.js          # Browser-side form submission
 │
-├── scripts/                   # (planned) CLI helpers
-│   └── print_context.py       # Dump context JSON for one title
-│
-├── analysis/                  # Optional — not on critical path
-│   └── notebook.ipynb         # Exploratory charts only
-│
-└── logs/                      # Auto-generated at runtime, not committed
-    └── scraper.log            # One line per run: timestamp + result
+└── logs/
+    └── scraper.log            # Runtime log file, generated locally
 ```
 
----
+## Data Model
 
-## 📦 Data Schema
-
-### Current (stored today)
-
-Each document in `steamscope.deals` represents one game from one scrape run:
+Each document in `steamscope.deals` represents one game captured during one scrape run:
 
 ```json
 {
-  "title":            "Elden Ring",
-  "original_price":   199.99,
+  "title": "Elden Ring",
+  "original_price": 199.99,
   "discounted_price": 99.99,
-  "discount_pct":     50,
-  "url":              "https://store.steampowered.com/app/...",
-  "scraped_at":       "2025-03-25T14:00:00"
+  "discount_pct": 50,
+  "url": "https://store.steampowered.com/app/...",
+  "scraped_at": "2026-06-06T06:00:00"
 }
 ```
 
-This schema is enough for Phases 7–8 (price history over time).
+This intentionally small schema is enough to build price history, compare lows and averages, and produce a useful recommendation once enough snapshots have been collected.
 
-### Optional enrichment
+## Advisor Flow
 
-These fields improve AI context but are **not required** for the deal advisor:
+1. The scraper collects discounted games from Steam and stores them in MongoDB.
+2. The web UI lists distinct game titles from the database.
+3. The user selects a game and enters a proposed discounted price.
+4. `application/context.py` builds a compact historical summary.
+5. `application/gemini_advisor.py` sends that context to Gemini.
+6. The UI displays the returned verdict JSON.
 
-```json
-{
-  "genres":       ["RPG", "Action"],
-  "rating":       "Very Positive",
-  "review_count": 120400
-}
-```
+The current advisor response is intentionally direct and developer-friendly. A more polished presentation layer is a planned improvement.
 
----
-
-## 🗺️ Roadmap
-
-- [x] Phase 1 — Project setup and folder structure
-- [x] Phase 2 — Steam scraper (single page, validation, MongoDB insert)
-- [x] Phase 3 — MongoDB integration (`db.py`)
-- [x] Phase 4 — Pagination (scrape 4–5 pages per run, ~100–125 games)
-- [x] Phase 5 — Scheduler + logging (`scheduler.py` + `main.py`)
-- [ ] Phase 6 — Data collection period *(let it run for 3–5 days)*
-- [x] Phase 7 — MongoDB deal context builder (`context.py`, db queries)
-- [ ] Phase 8 — Deal advisor website + Gemini (Gemini advisor implemented; web UI pending)
-
----
-
-## ⚙️ Setup
+## Setup
 
 ### Prerequisites
 
-- Python 3.14+ (see `.python-version` and `pyproject.toml`)
-- [`uv`](https://github.com/astral-sh/uv) package manager
-- A free [MongoDB Atlas](https://www.mongodb.com/atlas) account
-- A [Google AI Studio](https://aistudio.google.com/) API key for Gemini (Phase 8)
+- Python 3.14+
+- [`uv`](https://github.com/astral-sh/uv)
+- MongoDB Atlas connection string
+- Google Gemini API key
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/steamscope.git
-cd steamscope
-```
-
-### 2. Install uv (if you don't have it)
-
-```bash
-pip install uv
-```
-
-### 3. Install all dependencies
+### Install Dependencies
 
 ```bash
 uv sync
 ```
 
-This reads `uv.lock` and installs the exact same versions used in development — no manual version management needed.
+### Configure Environment
 
-### 4. Configure environment variables
+Create a local `.env` file from the template:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in your values:
+Fill in the values:
 
-```
+```env
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/steamscope
 SCRAPE_TIME=06:00
 RUN_ON_STARTUP=false
 GEMINI_API_KEY=your_key_here
 ```
 
-- `SCRAPE_TIME` — 24-hour format (`HH:MM`); scheduler runs the scraper once per day at this time.
-- `RUN_ON_STARTUP` — set to `true` to run one scrape immediately when starting `main.py`.
-- `GEMINI_API_KEY` — required for Phase 8 (deal advisor); get one from Google AI Studio.
+`SCRAPE_TIME` uses 24-hour `HH:MM` format. Set `RUN_ON_STARTUP=true` if you want one scrape to run immediately when the scheduler starts.
 
-### 5. Test MongoDB connection (optional)
+## Running the Project
+
+Test the MongoDB connection:
 
 ```bash
 uv run python application/db.py
 ```
 
-### 6. Run the scraper manually (test)
+Run the scraper manually:
 
 ```bash
 uv run python application/scraper.py
 ```
 
-### 7. Start the scheduler
+Start the daily scheduler:
 
 ```bash
 uv run python main.py
 ```
 
-The scheduler runs the scraper once per day at `SCRAPE_TIME` and logs each run to `logs/scraper.log`.
+Start the local web app:
 
----
+```bash
+uv run uvicorn web.app:app --reload
+```
 
-## 🗄️ MongoDB Atlas — Free Tier Setup
+Then open:
 
-This project uses MongoDB Atlas M0 — free forever, no credit card required.
+```text
+http://127.0.0.1:8000
+```
 
-1. Go to [mongodb.com/atlas](https://www.mongodb.com/atlas)
-2. Create a free account
-3. Create a new cluster → choose **M0 Free**
-4. Create a database user (username + password)
-5. Whitelist your IP address (or use `0.0.0.0/0` for development)
-6. Click **Connect** → **Drivers** → copy the connection string
-7. Paste it into your `.env` file as `MONGO_URI`
+## API
 
----
+| Route | Method | Description |
+| --- | --- | --- |
+| `/` | `GET` | Renders the advisor form with game titles from MongoDB |
+| `/api/advise` | `POST` | Analyzes a proposed price for a selected game |
 
-## 🤖 Deal Advisor (Phases 7–8)
-
-### User flow
-
-1. Pick a game from a dropdown (titles scraped into MongoDB).
-2. Enter the **proposed discounted price** you are considering.
-3. The backend loads that game's price history, builds a JSON context, and asks Gemini for a verdict.
-4. The site shows a short answer: **good**, **fair**, or **wait**, plus a brief explanation.
-
-### Example context JSON (sent to Gemini)
+Example request:
 
 ```json
 {
-  "game": "Elden Ring",
-  "proposed_discounted_price": 39.99,
-  "history": {
-    "scrape_count": 12,
-    "first_seen": "2025-03-20T06:00:00",
-    "last_seen": "2025-03-25T06:00:00",
-    "lowest_discounted_price": 34.99,
-    "highest_discounted_price": 59.99,
-    "average_discounted_price": 44.50,
-    "average_discount_pct": 38,
-    "recent_snapshots": [
-      { "discounted_price": 39.99, "discount_pct": 50, "scraped_at": "2025-03-25T06:00:00" }
-    ]
-  }
+  "title": "Elden Ring",
+  "proposed_price": 39.99
 }
 ```
 
-### Planned API routes (Phase 8)
+Example response shape:
 
-| Route          | Method | Purpose                                              |
-|----------------|--------|------------------------------------------------------|
-| `/`            | GET    | Render the form                                      |
-| `/api/games`   | GET    | List distinct game titles from MongoDB               |
-| `/api/advise`  | POST   | `{ "title": "...", "proposed_price": 29.99 }` → verdict |
+```json
+{
+  "verdict": "good",
+  "summary": "The proposed price is below the recent average but not the historical low.",
+  "confidence": 80,
+  "key_insights": [
+    "Recent prices are higher than the proposed price",
+    "Historical low is still lower than this offer"
+  ]
+}
+```
 
----
+## Roadmap
 
-## 📊 Optional Visualizations
+- [x] Project setup with `uv`
+- [x] Steam scraper with validation
+- [x] MongoDB integration
+- [x] Multi-page scraping
+- [x] Scheduler and logging
+- [x] Historical deal context builder
+- [x] Gemini advisor integration
+- [x] Basic FastAPI web interface
+- [ ] Longer data collection period for stronger recommendations
+- [ ] Better UI formatting for advisor results
+- [ ] More graceful frontend/API error handling
+- [ ] Optional exploratory notebooks and visualizations
 
-Not required for the deal advisor. If you explore data in `analysis/notebook.ipynb`:
+## Notes
 
-- **Histogram** — discount % distribution (works with current schema)
-- **Heatmap** — average discount by day of week (`scraped_at`)
-- **Bar chart** — top discounted genres (needs optional `genres` field)
-- **Scatter plot** — rating vs discount % (needs optional `rating` field)
+- `.env` should never be committed.
+- `logs/scraper.log` is generated at runtime.
+- The advisor is only as useful as the available historical data. Running the scraper over multiple days improves the quality of recommendations.
+- This project is for educational purposes. Respect Steam's terms of service and avoid aggressive scraping.
 
----
-
-## 📋 Requirements
-
-- Python 3.14+
-- MongoDB Atlas account (free)
-- Google Gemini API key (Phase 8)
-- Internet connection for scraping, DB access, and Gemini
-
----
-
-## ⚠️ Disclaimer
-
-This project is for **educational purposes only**. Always respect a website's `robots.txt` and terms of service. Steam's public search page does not require authentication or API keys.
-
----
-
-## 📄 License
+## License
 
 MIT
