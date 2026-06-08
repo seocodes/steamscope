@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 import logging
 
 from application.db import list_games_titles
+from application.redis_client import create_redis_client, check_rate_limit
 from application.gemini_advisor import analyze_deal
 from application.context import build_deal_context
 
@@ -22,6 +23,8 @@ class AdviceRequest(BaseModel):
         if not value:
             raise ValueError("Title must not be empty")
         return value
+
+redis_client = create_redis_client()
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +49,15 @@ async def home(request: Request):
 
 
 @app.post("/api/advise")
-def advise_game(advice_request: AdviceRequest):
+def advise_game(request: Request, advice_request: AdviceRequest):
+    # Se tiver uma rotating proxy eh gg pa nois
+    client_ip = request.client.host
+    rate_limit_key = f"rate_limit:advise:{client_ip}"
+
+    allowed = check_rate_limit(redis_client, rate_limit_key, limit=5, period=45)
+    if not allowed:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    
     try:
         context = build_deal_context(
             advice_request.title,

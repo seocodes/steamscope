@@ -14,6 +14,7 @@ form.addEventListener('submit', async function(event) {
   const button = document.querySelector("button[type='submit']");
   button.disabled = true;
   button.innerText = "Analyzing...";
+  
   try {
     const game_title = document.getElementById("title").value;
     const proposed_price = Number(document.getElementById("proposed_price").value);
