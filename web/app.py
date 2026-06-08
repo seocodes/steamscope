@@ -38,9 +38,11 @@ async def home(request: Request):
         return templates.TemplateResponse(
             name="index.html", request=request, context={"games": games}
         )
-    except Exception as exc:
+    except Exception:
+        # Log interno detalhado com stack trace
         logger.exception("Failed to render home page")
-        return JSONResponse(content={"Internal Server Error"}, status_code=500)
+        # Resposta de erro genérica para o cliente
+        return JSONResponse(content={"error": "Internal Server Error"}, status_code=500)
 
 
 @app.post("/api/advise")
@@ -50,8 +52,19 @@ def advise_game(advice_request: AdviceRequest):
             advice_request.title,
             advice_request.proposed_price,
         )
-        analysis = analyze_deal(context)
     except ValueError as exc:
+        logger.exception("Invalid input.")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+        
+    try:
+        analysis = analyze_deal(context)
+    except ValueError:
+        logger.exception("Advisor service is not configured correctly.")
+        raise HTTPException(status_code=503, detail="Advisor service unavailable")
+        
+    except Exception:
+        logger.exception("Advisor service error")
+        raise HTTPException(status_code=502, detail="Advisor service failed")
+    
 
     return JSONResponse(content=analysis)
