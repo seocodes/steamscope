@@ -1,18 +1,30 @@
-
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator, Field
 from fastapi.templating import Jinja2Templates
+import logging
 
 from application.db import list_games_titles
 from application.gemini_advisor import analyze_deal
 from application.context import build_deal_context
 
 class AdviceRequest(BaseModel):
-    title: str
-    proposed_price: float
+    model_config = ConfigDict(extra="forbid")
     
+    title: str = Field(min_length=1, max_length=200)
+    proposed_price: float = Field(ge=0, le=10000)
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("Title must not be empty")
+        return value
+
+logger = logging.getLogger(__name__)
+
 templates = Jinja2Templates(directory="web/templates")
 
 app = FastAPI()
@@ -26,8 +38,9 @@ async def home(request: Request):
         return templates.TemplateResponse(
             name="index.html", request=request, context={"games": games}
         )
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+    except Exception as exc:
+        logger.exception("Failed to render home page")
+        return JSONResponse(content={"Internal Server Error"}, status_code=500)
 
 
 @app.post("/api/advise")
