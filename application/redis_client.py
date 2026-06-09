@@ -7,7 +7,7 @@ import hashlib
 load_dotenv()
 
 def create_redis_client():
-    redis_url = os.getenv("REDIS_URL")
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     return Redis.from_url(redis_url, decode_responses=True)
 
 def check_rate_limit(redis_client, key, limit, period):
