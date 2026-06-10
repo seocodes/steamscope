@@ -1,15 +1,17 @@
-from fastapi import FastAPI, Request, HTTPException
+import json
+import logging
+
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, field_validator, Field
 from fastapi.templating import Jinja2Templates
-import logging
-import json
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from application.db import list_games_titles
-from application.redis_client import create_redis_client, check_rate_limit, build_advice_cache_key
-from application.gemini_advisor import analyze_deal
 from application.context import build_deal_context
+from application.db import list_games_titles
+from application.gemini_advisor import analyze_deal
+from application.redis_client import build_advice_cache_key, check_rate_limit, create_redis_client
+
 
 class AdviceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")

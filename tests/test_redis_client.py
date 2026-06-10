@@ -1,5 +1,6 @@
 from application.redis_client import build_advice_cache_key, check_rate_limit
 
+
 # Redis client Mock
 class FakeRedisClient:
     def __init__(self):

@@ -1,5 +1,6 @@
 from application.scheduler import start_scheduler
 
+
 def main():
     start_scheduler()
 

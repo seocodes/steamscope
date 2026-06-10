@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
+
 from web.app import AdviceRequest
+
 
 def test_advice_request_strips_title():
     request = AdviceRequest(title="  test  ", proposed_price=100)
