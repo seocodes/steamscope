@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -26,6 +27,10 @@ class AdviceRequest(BaseModel):
         if not value:
             raise ValueError("Title must not be empty")
         return value
+
+ADVISOR_CACHE_TTL_SECONDS = int(os.getenv("ADVISOR_CACHE_TTL_SECONDS", 300))
+RATE_LIMIT_PERIOD_SECONDS = int(os.getenv("RATE_LIMIT_PERIOD_SECONDS", 45))
+RATE_LIMIT_MAX_REQUESTS = int(os.getenv("RATE_LIMIT_MAX_REQUESTS", 5))
 
 redis_client = create_redis_client()
 
@@ -57,7 +62,13 @@ def advise_game(request: Request, advice_request: AdviceRequest):
     client_ip = request.client.host
     rate_limit_key = f"rate_limit:advise:{client_ip}"
 
-    allowed = check_rate_limit(redis_client, rate_limit_key, limit=5, period=45)
+    allowed = check_rate_limit(
+        redis_client,
+        rate_limit_key,
+        RATE_LIMIT_MAX_REQUESTS,
+        RATE_LIMIT_PERIOD_SECONDS,
+    )
+
     if not allowed:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
 
@@ -69,7 +80,10 @@ def advise_game(request: Request, advice_request: AdviceRequest):
     cached = redis_client.get(cache_key)
     
     if cached:
-        return JSONResponse(content=json.loads(cached))
+        return JSONResponse(
+            content=json.loads(cached),
+            headers={"X-Cache": "HIT"},
+        )
 
     try:
         context = build_deal_context(
@@ -92,8 +106,11 @@ def advise_game(request: Request, advice_request: AdviceRequest):
 
     redis_client.setex(
         cache_key,
-        300,  # 5 minutes
+        ADVISOR_CACHE_TTL_SECONDS,  # 5 minutes by default
         json.dumps(analysis),
     )
 
-    return JSONResponse(content=analysis)
+    return JSONResponse(
+        content=analysis,
+        headers={"X-Cache": "MISS"},
+    )

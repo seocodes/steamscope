@@ -14,7 +14,7 @@ def check_rate_limit(redis_client, key, limit, period):
     current_count = redis_client.incr(key)
 
     if current_count == 1:
-        # Define expiration time (I'll probably put a 45s time period)
+        # Defines expiration time
         redis_client.expire(key, period)
 
     if current_count > limit:
@@ -27,4 +27,4 @@ def build_advice_cache_key(title, proposed_price):
     raw_key = f"{normalized_title}:{normalized_price}"
 
     digest = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
-    return f"cache:advise:{digest}"
+    return f"cache:advise:v1:{digest}"
