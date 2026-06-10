@@ -82,13 +82,13 @@ def advise_game(request: Request, advice_request: AdviceRequest):
         
     try:
         analysis = analyze_deal(context)
-    except ValueError:
+    except ValueError as exc:
         logger.exception("Advisor service is not configured correctly.")
-        raise HTTPException(status_code=503, detail="Advisor service unavailable")
+        raise HTTPException(status_code=503, detail="Advisor service unavailable") from exc
         
-    except Exception:
+    except Exception as exc:
         logger.exception("Advisor service error")
-        raise HTTPException(status_code=502, detail="Advisor service failed")
+        raise HTTPException(status_code=502, detail="Advisor service failed") from exc
 
     redis_client.setex(
         cache_key,

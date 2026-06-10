@@ -12,8 +12,8 @@ def read_proposed_price():
     raw_price = input("Enter a proposed price: ").strip().replace(",", ".")
     try:
         proposed_price = float(raw_price)
-    except ValueError:
-        raise ValueError("Invalid price. Please enter a valid number.")
+    except ValueError as exc:
+        raise ValueError("Invalid price. Please enter a valid number.") from exc
 
     if proposed_price < 0:
         raise ValueError("Price cannot be negative.")

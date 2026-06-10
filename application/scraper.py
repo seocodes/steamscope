@@ -31,7 +31,10 @@ def validate_game_record(record):
         original_price = float(original_price)
         discounted_price = float(discounted_price)
     except (TypeError, ValueError):
-        return False, f"Prices not numeric: original={original_price}, discounted={discounted_price}"
+        return (
+            False,
+            f"Prices not numeric: original={original_price}, discounted={discounted_price}",
+        )
     
     if discounted_price > original_price:
         return False, f"Discounted price ({discounted_price}) > original price ({original_price})"
@@ -51,7 +54,10 @@ def fetch_page(page, max_retries=3, timeout=10):
     url = f"{base_url}&page={page}" if page > 1 else base_url
     
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        )
     }
     
     for attempt in range(max_retries):
@@ -67,9 +73,14 @@ def fetch_page(page, max_retries=3, timeout=10):
             return page
         
         except requests.exceptions.Timeout:
-            logger.warning(f"Timeout on attempt {attempt + 1}. Server took longer than {timeout}s to respond.")
+            logger.warning(
+                f"Timeout on attempt {attempt + 1}. "
+                f"Server took longer than {timeout}s to respond."
+            )
         except requests.exceptions.ConnectionError:
-            logger.warning(f"Connection error on attempt {attempt + 1}. Network issue or server down.")
+            logger.warning(
+                f"Connection error on attempt {attempt + 1}. Network issue or server down."
+            )
         except requests.exceptions.HTTPError as e:
             logger.warning(f"HTTP error on attempt {attempt + 1}: {e}")
         except Exception as e:

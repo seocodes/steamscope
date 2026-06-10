@@ -7,8 +7,8 @@ except ModuleNotFoundError:
 def _ensure_float_price(value, field_name, title):
     try:
         return float(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"Invalid {field_name} for title '{title}': {value}")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid {field_name} for title '{title}': {value}") from exc
 
 def _average(values):
     return sum(values) / len(values)
@@ -23,8 +23,14 @@ def build_deal_context(title, proposed_price):
     if not deals:
         raise ValueError(f"No deals found for title '{title}'")
         
-    dct_prices = [_ensure_float_price(deal.get("discounted_price"), "discounted_price", title) for deal in deals]
-    discount_pcts = [_ensure_float_price(deal.get("discount_pct"), "discount_pct", title) for deal in deals]
+    dct_prices = [
+        _ensure_float_price(deal.get("discounted_price"), "discounted_price", title)
+        for deal in deals
+    ]
+    discount_pcts = [
+        _ensure_float_price(deal.get("discount_pct"), "discount_pct", title)
+        for deal in deals
+    ]
     avg_dct_price = _average(dct_prices)
     avg_dct_pct = _average(discount_pcts)
     
@@ -36,9 +42,14 @@ def build_deal_context(title, proposed_price):
     recent_snapshots = [
         {
             "scraped_at": deal.get("scraped_at"),
-            "discounted_price": _ensure_float_price(deal.get("discounted_price"), "discounted_price", title),
+            "discounted_price": _ensure_float_price(
+                deal.get("discounted_price"),
+                "discounted_price",
+                title,
+            ),
             "discount_pct": _ensure_float_price(deal.get("discount_pct"), "discount_pct", title),
-        } for deal in deals[:5]
+        }
+        for deal in deals[:5]
     ]
 
     context = {
@@ -51,11 +62,21 @@ def build_deal_context(title, proposed_price):
                 "min": round(min(dct_prices), 2),
                 "max": round(max(dct_prices), 2),
                 "avg": round(avg_dct_price, 2),
-                "latest": round(_ensure_float_price(newest.get("discounted_price"), "discounted_price", title), 2),
+                "latest": round(
+                    _ensure_float_price(
+                        newest.get("discounted_price"),
+                        "discounted_price",
+                        title,
+                    ),
+                    2,
+                ),
             },
             "discount_pct": {
                 "avg": round(avg_dct_pct, 2),
-                "latest": round(_ensure_float_price(newest.get("discount_pct"), "discount_pct", title), 2),
+                "latest": round(
+                    _ensure_float_price(newest.get("discount_pct"), "discount_pct", title),
+                    2,
+                ),
             },
             "recent_snapshots": recent_snapshots,
         },

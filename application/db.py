@@ -64,4 +64,4 @@ if __name__ == "__main__":
         ping_mongodb()
         print("Pinged your deployment. You successfully connected to MongoDB!")
     except Exception as exc:
-        raise SystemExit(f"MongoDB connection failed: {exc}")
+        raise SystemExit(f"MongoDB connection failed: {exc}") from exc
