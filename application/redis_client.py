@@ -1,8 +1,8 @@
+import hashlib
 import os
 
 from dotenv import load_dotenv
 from redis import Redis
-import hashlib
 
 load_dotenv()
 

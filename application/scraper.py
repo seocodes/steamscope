@@ -1,8 +1,9 @@
-import re
-import requests
 import logging
+import re
 import time
 from datetime import datetime
+
+import requests
 from bs4 import BeautifulSoup
 
 try:
