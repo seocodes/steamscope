@@ -46,8 +46,23 @@ def validate_game_record(record):
     scraped_at = record.get("scraped_at")
     if not scraped_at:
         return False, "Missing scraped_at timestamp"
+
+    steam_app_id = record.get("steam_app_id")
+    if not steam_app_id:
+        return False, "Missing steam_app_id"
+
+    idempotency_key = record.get("idempotency_key")
+    if not idempotency_key:
+        return False, "Missing idempotency_key"
     
     return True, ""
+
+# Steam store URLs usually include the app id in /app/{app_id}/
+def extract_steam_app_id(url):
+    match = re.search(r"/app/(\d+)", url)
+    if not match:
+        return None
+    return match.group(1)
 
 def fetch_page(page, max_retries=3, timeout=10):
     base_url = "https://store.steampowered.com/search/?specials=1"
@@ -145,10 +160,18 @@ def parse_game(element):
     
     try:
         url = element.get("href", "")
+        
         if not url:
             logger.warning(f"No URL for game: {record['title']}")
             return None
+            
+        steam_app_id = extract_steam_app_id(url)
+        if not steam_app_id:
+            logger.warning(f"No ID for game: {record['title']}")
+            return None
         record["url"] = url
+        record["steam_app_id"] = steam_app_id
+        
     except Exception as e:
         logger.warning(f"Error extracting URL: {e}")
         return None
@@ -184,8 +207,11 @@ def parse_game(element):
     except Exception as e:
         logger.warning(f"Error extracting discounted price for {record['title']}: {e}")
         record["discounted_price"] = 0.0
-    
-    record["scraped_at"] = datetime.now().isoformat()
+
+    scraped_at = datetime.now()
+    record["scraped_at"] = scraped_at.isoformat()
+    record["scraped_date"] = scraped_at.date().isoformat()
+    record["idempotency_key"] = f"steam_specials:{record['steam_app_id']}:{record['scraped_date']}"
     
     is_valid, error_msg = validate_game_record(record)
     if not is_valid:

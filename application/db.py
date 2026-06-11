@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
 from pymongo.server_api import ServerApi
 
 load_dotenv()
@@ -20,12 +20,10 @@ def ping_mongodb():
     client.admin.command("ping")
     return client
 
-
 def get_deals_collection():
     client = create_client()
     collection = client["steamscope"]["deals"]
     return client, collection
-
 
 def insert_deals(records):
     if not records:
@@ -33,8 +31,18 @@ def insert_deals(records):
 
     client, collection = get_deals_collection()
     try:
-        result = collection.insert_many(records, ordered=False)
-        return len(result.inserted_ids)
+        collection.create_index("idempotency_key", unique=True, sparse=True)
+
+        operations = [
+            UpdateOne(
+                {"idempotency_key": record["idempotency_key"]},  # Filter by idempotency key
+                {"$setOnInsert": record},  # Only sets idempotency key on insert, not on update
+                upsert=True)  # Insert if not exists - upsert = update + insert (depends)
+            for record in records
+        ]
+        
+        result = collection.bulk_write(operations, ordered=False)
+        return result.upserted_count
     finally:
         client.close()
 
