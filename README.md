@@ -1,82 +1,97 @@
 # SteamScope
 
-SteamScope tracks Steam discounts over time and uses that history to evaluate whether a proposed sale price is actually worth it.
+SteamScope e um MVP em Python para acompanhar descontos da Steam e usar o historico coletado para responder uma pergunta simples:
 
-The project is a practical backend learning exercise around web scraping, MongoDB, FastAPI, Redis, external AI APIs, automated tests, and CI.
+> Esse preco promocional parece bom para este jogo?
 
-## Goal
+O projeto esta em um ponto funcional para estudo e uso local, mas ainda nao esta pronto como produto. Por enquanto, ele fica como esta: scraper, persistencia, API, interface web simples, cache/rate limit e testes basicos.
 
-SteamScope answers one question:
+## Situacao Atual
 
-> Is this discount actually good for this game?
+O que ja existe:
 
-The app compares a proposed discounted price with previously scraped Steam sale data and returns a concise recommendation based on the game's own historical prices.
+- Scraper de promocoes da Steam com parsing via BeautifulSoup.
+- Validacao basica dos registros coletados.
+- Escrita idempotente no MongoDB usando `idempotency_key` e upsert.
+- Scheduler diario configuravel por variaveis de ambiente.
+- Geracao de contexto historico por jogo.
+- Advisor com Google Gemini retornando um JSON de recomendacao.
+- App FastAPI com pagina HTML simples e endpoint JSON.
+- Redis para rate limit por IP e cache de respostas do advisor.
+- Testes unitarios para validacao da API, cache/rate limit e parsing da resposta do Gemini.
+- CI no GitHub Actions rodando Ruff e pytest.
 
-## Current Status
+O que ainda esta cru:
 
-The current MVP includes:
+- A UI apenas envia o formulario e mostra o JSON bruto da resposta.
+- O scraper depende da estrutura atual da pagina da Steam, entao pode quebrar se o HTML mudar.
+- O historico so fica realmente util depois de varios dias de coleta.
+- Nao ha deploy configurado.
+- Nao ha camada de autenticacao, observabilidade ou tratamento operacional mais robusto.
+- O projeto exige MongoDB, Redis e chave do Gemini para o fluxo completo.
 
-- Steam sale scraping with validation and retry handling.
-- MongoDB Atlas persistence for historical deal snapshots.
-- Daily scheduling with configurable runtime and log output.
-- Historical context generation for a selected game.
-- Gemini-based deal analysis from compact JSON context.
-- FastAPI web interface and JSON API.
-- Pydantic request validation for the advisor endpoint.
-- Redis rate limiting by client IP.
-- Redis response caching for repeated advisor requests.
-- Unit tests for validation, cache keys, and rate limit behavior.
-- GitHub Actions CI running the test suite automatically.
+## Stack
 
-## Tech Stack
+| Area | Ferramentas |
+| --- | --- |
+| Scraping | `requests`, `beautifulsoup4` |
+| Banco | MongoDB Atlas, `pymongo` |
+| Backend | FastAPI, Pydantic, Jinja2 |
+| IA | Google Gemini API (`google-genai`) |
+| Cache / rate limit | Redis, `redis-py` |
+| Scheduler | `schedule` |
+| Testes | `pytest`, `ruff` |
+| Ambiente | `uv`, `python-dotenv` |
 
-| Layer | Tooling | Purpose |
-| --- | --- | --- |
-| Scraping | `requests`, `beautifulsoup4` | Fetch and parse Steam sale pages |
-| Database | MongoDB Atlas, `pymongo` | Store historical deal snapshots |
-| Cache / rate limit | Redis, `redis-py` | Reduce repeated work and limit abuse |
-| Scheduling | `schedule` | Run the scraper daily |
-| Backend | FastAPI, Pydantic, Jinja2 | Serve the web UI and API |
-| AI | Google Gemini API | Evaluate proposed prices against historical context |
-| Tests | `pytest` | Validate core behavior without external services |
-| CI | GitHub Actions | Run tests in a clean environment on push/PR |
-| Environment | `python-dotenv`, `uv` | Manage config and dependencies |
-
-## Project Structure
+## Estrutura
 
 ```text
 steamscope/
-├── .github/
-│   └── workflows/
-│       └── ci.yml                 # GitHub Actions test workflow
 ├── application/
-│   ├── context.py                 # Historical deal context builder
-│   ├── context_smoke_test.py      # Manual smoke test for advisor flow
-│   ├── db.py                      # MongoDB connection and queries
-│   ├── gemini_advisor.py          # Gemini prompt and response parsing
-│   ├── redis_client.py            # Redis client, rate limit, cache key helpers
-│   ├── scheduler.py               # Daily scraper scheduling and logging
-│   └── scraper.py                 # Steam scraping and record parsing
+│   ├── context.py             # Monta o contexto historico do jogo
+│   ├── context_smoke_test.py  # Smoke test manual do fluxo de contexto/advisor
+│   ├── db.py                  # Conexao e consultas MongoDB
+│   ├── gemini_advisor.py      # Prompt, chamada Gemini e parsing da resposta
+│   ├── redis_client.py        # Cliente Redis, rate limit e cache keys
+│   ├── scheduler.py           # Agendamento diario do scraper
+│   └── scraper.py             # Scraper e parser das promocoes da Steam
 ├── tests/
-│   ├── test_api_validation.py     # Pydantic request validation tests
-│   └── test_redis_client.py       # Cache key and rate limit tests
+│   ├── test_api_validation.py
+│   ├── test_gemini_advisor.py
+│   └── test_redis_client.py
 ├── web/
-│   ├── app.py                     # FastAPI app and advisor endpoint
-│   ├── static/
-│   │   └── script.js              # Browser-side form submission
-│   └── templates/
-│       └── index.html             # Advisor UI
-├── main.py                        # Scheduler entry point
-├── pyproject.toml                 # Project metadata, deps, pytest config
-├── uv.lock                        # Reproducible dependency lockfile
-├── .env.example                   # Environment variable template
-├── README.md
-└── PLANNING.md
+│   ├── app.py                 # App FastAPI
+│   ├── static/script.js       # Submit do formulario
+│   └── templates/index.html   # UI simples do advisor
+├── main.py                    # Entrada do scheduler
+├── pyproject.toml
+├── uv.lock
+├── PLANNING.md
+└── README.md
 ```
 
-## Data Model
+## Fluxo Principal
 
-Each document in `steamscope.deals` represents one game captured during one scrape run:
+```text
+Scraper
+  -> Steam specials
+  -> parser/validacao
+  -> MongoDB
+
+Web advisor
+  -> FastAPI
+  -> Pydantic validation
+  -> Redis rate limit
+  -> Redis cache lookup
+  -> MongoDB historico por titulo
+  -> Gemini
+  -> Redis cache write
+  -> JSON response
+```
+
+## Modelo de Dados
+
+Cada documento em `steamscope.deals` representa um jogo visto em uma execucao do scraper:
 
 ```json
 {
@@ -85,62 +100,36 @@ Each document in `steamscope.deals` represents one game captured during one scra
   "discounted_price": 99.99,
   "discount_pct": 50,
   "url": "https://store.steampowered.com/app/...",
-  "scraped_at": "2026-06-06T06:00:00"
+  "steam_app_id": "1245620",
+  "scraped_at": "2026-06-10T06:00:00",
+  "scraped_date": "2026-06-10",
+  "idempotency_key": "steam_specials:1245620:2026-06-10"
 }
 ```
 
-This intentionally small schema is enough to build price history, compare lows and averages, and produce useful recommendations once enough snapshots have been collected.
+## Setup Local
 
-## Advisor Flow
-
-```text
-Browser
-  -> FastAPI request validation
-  -> Redis rate limit by IP
-  -> Redis cache lookup
-  -> MongoDB historical data query
-  -> Gemini deal analysis
-  -> Redis cache write with TTL
-  -> JSON response
-```
-
-Detailed flow:
-
-1. The scraper collects discounted games from Steam and stores them in MongoDB.
-2. The web UI lists distinct game titles from the database.
-3. The user selects a game and enters a proposed discounted price.
-4. FastAPI/Pydantic validates the request body.
-5. Redis counts requests per IP and blocks excess calls with `429 Too Many Requests`.
-6. Redis checks whether the same `title + proposed_price` analysis is already cached.
-7. On cache miss, `application/context.py` builds a compact historical summary.
-8. `application/gemini_advisor.py` sends that context to Gemini.
-9. The response is cached for a short TTL and returned as JSON.
-
-## Setup
-
-### Prerequisites
+Prerequisitos:
 
 - Python 3.14+
-- [`uv`](https://github.com/astral-sh/uv)
-- MongoDB Atlas connection string
-- Google Gemini API key
-- Redis, local or hosted
+- `uv`
+- MongoDB Atlas ou MongoDB acessivel por URI
+- Redis local ou remoto
+- Chave da Google Gemini API
 
-### Install Dependencies
+Instale as dependencias:
 
 ```bash
 uv sync --dev
 ```
 
-### Configure Environment
-
-Create a local `.env` file from the template:
+Crie o `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the values:
+Variaveis esperadas:
 
 ```env
 MONGO_URI=mongodb+srv://<user>:<password>@cluster0.mongodb.net/steamscope
@@ -148,63 +137,50 @@ SCRAPE_TIME=06:00
 RUN_ON_STARTUP=false
 GEMINI_API_KEY=your_key_here
 REDIS_URL=redis://localhost:6379/0
+ADVISOR_CACHE_TTL_SECONDS=300
+RATE_LIMIT_PERIOD_SECONDS=45
+RATE_LIMIT_MAX_REQUESTS=5
 ```
 
-`SCRAPE_TIME` uses 24-hour `HH:MM` format. Set `RUN_ON_STARTUP=true` if you want one scrape to run immediately when the scheduler starts.
-
-### Run Redis Locally
-
-Using Docker:
+Redis local com Docker:
 
 ```bash
 docker run --name steamscope-redis -p 6379:6379 redis:7-alpine
 ```
 
-If the container already exists:
+Se o container ja existir:
 
 ```bash
 docker start steamscope-redis
 ```
 
-Check Redis:
+## Como Rodar
 
-```bash
-redis-cli ping
-```
-
-Expected response:
-
-```text
-PONG
-```
-
-## Running the Project
-
-Test the MongoDB connection:
+Testar conexao com MongoDB:
 
 ```bash
 uv run python application/db.py
 ```
 
-Run the scraper manually:
+Rodar o scraper manualmente:
 
 ```bash
 uv run python application/scraper.py
 ```
 
-Start the daily scheduler:
+Rodar o scheduler:
 
 ```bash
 uv run python main.py
 ```
 
-Start the local web app:
+Rodar a web UI:
 
 ```bash
 uv run uvicorn web.app:app --reload
 ```
 
-Then open:
+Depois acesse:
 
 ```text
 http://127.0.0.1:8000
@@ -212,12 +188,12 @@ http://127.0.0.1:8000
 
 ## API
 
-| Route | Method | Description |
+| Rota | Metodo | Descricao |
 | --- | --- | --- |
-| `/` | `GET` | Renders the advisor form with game titles from MongoDB |
-| `/api/advise` | `POST` | Analyzes a proposed price for a selected game |
+| `/` | `GET` | Renderiza a pagina com os jogos encontrados no MongoDB |
+| `/api/advise` | `POST` | Analisa um preco proposto para um jogo |
 
-Example request:
+Request:
 
 ```json
 {
@@ -226,7 +202,7 @@ Example request:
 }
 ```
 
-Example response shape:
+Response esperada:
 
 ```json
 {
@@ -240,104 +216,27 @@ Example response shape:
 }
 ```
 
-## Security And Reliability Notes
+O endpoint tambem usa o header `X-Cache` com valores como `HIT`, `MISS` ou `BYPASS`.
 
-- Frontend validation improves UX; backend validation is the real security boundary.
-- `AdviceRequest` rejects empty titles, negative prices, overly large prices, and unexpected fields.
-- Internal errors are logged server-side and returned as generic API errors.
-- Redis rate limiting reduces accidental spam and basic abuse of the Gemini-backed endpoint.
-- Redis caching reduces repeated calls to MongoDB and Gemini for identical advisor requests.
-- The UI uses text rendering for API output, not HTML injection, which lowers XSS risk.
-- `.env` must stay local and should never be committed.
+## Testes
 
-## Tests
-
-Run the test suite:
+Rodar tudo:
 
 ```bash
 uv run python -m pytest
 ```
 
-The current tests cover:
+Rodar lint:
 
-- Cache key normalization.
-- Price normalization for cache keys.
-- Rate limit blocking after the configured limit.
-- Redis expiration being set once per fixed window.
-- API request validation with Pydantic.
-
-Testing model:
-
-```text
-Arrange -> prepare data
-Act -> run behavior
-Assert -> verify expectation
+```bash
+uv run ruff check .
 ```
 
-For external dependencies, the tests use small fakes instead of real Redis, MongoDB, or Gemini. This keeps unit tests fast, deterministic, and cheap.
+O CI em `.github/workflows/ci.yml` roda os dois em push e pull request.
 
-## CI
+## Nota Final
 
-GitHub Actions runs the tests automatically on push and pull request.
-
-Workflow file:
-
-```text
-.github/workflows/ci.yml
-```
-
-Mental model:
-
-```text
-GitHub receives a push
--> creates a clean Ubuntu machine
--> checks out the repository
--> installs Python and uv
--> installs dependencies
--> runs pytest
--> marks the commit green or red
-```
-
-CI is not deployment. CI answers:
-
-```text
-Does this code still pass the automated checks in a clean environment?
-```
-
-CD would answer:
-
-```text
-Can this checked code be automatically deployed?
-```
-
-This project currently uses CI only.
-
-## Roadmap
-
-- [x] Project setup with `uv`
-- [x] Steam scraper with validation
-- [x] MongoDB integration
-- [x] Multi-page scraping
-- [x] Scheduler and logging
-- [x] Historical deal context builder
-- [x] Gemini advisor integration
-- [x] Basic FastAPI web interface
-- [x] API request validation
-- [x] Redis rate limiting
-- [x] Redis response caching
-- [x] Unit tests with `pytest`
-- [x] GitHub Actions CI
-- [ ] More polished advisor response UI
-- [ ] More graceful frontend loading/error states
-- [ ] Idempotent scraper writes with unique indexes/upserts
-- [ ] Optional deployment with production secrets management
-
-## Notes
-
-- `.env` should never be committed.
-- `logs/scraper.log` is generated at runtime.
-- The advisor is only as useful as the available historical data. Running the scraper over multiple days improves recommendation quality.
-- This project is for educational purposes. Respect Steam's terms of service and avoid aggressive scraping.
+Este repositorio esta em um bom ponto de pausa para um projeto de aprendizado: a ideia principal esta implementada de ponta a ponta, com integracoes reais e testes basicos. O proximo trabalho relevante, se o projeto voltar a andar, seria polir a UI, fortalecer o scraper e preparar uma estrategia simples de deploy/configuracao.
 
 ## License
 
