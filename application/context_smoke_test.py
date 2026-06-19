@@ -2,9 +2,20 @@ import json
 import logging
 
 from context import build_deal_context
+from db import list_games_by_snippet
 from gemini_advisor import analyze_deal
+from pymongo.errors import PyMongoError
 from redis.exceptions import RedisError
 from redis_client import build_advice_cache_key, create_redis_client
+
+logger = logging.getLogger(__name__)
+
+
+def configure_logging():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
 
 def build_context(title, proposed_price):
@@ -21,30 +32,55 @@ def read_proposed_price():
 
     if proposed_price < 0:
         raise ValueError("Price cannot be negative.")
-        
+
     return proposed_price
+
 
 def read_title():
     title = input("Enter the game title: ").strip()
 
     if not title:
         raise ValueError("Title cannot be empty.")
-    
+
     return title
 
+
+def read_search_term():
+    return input("Enter part of the game title: ").strip()
+
+
 def main():
+    configure_logging()
     redis_client = create_redis_client()
     cache_status = "MISS"
-    logger = logging.getLogger(__name__)
+
     while True:
         print("""
-            1 - Type a game title and proposed price to analyze a deal
+            0 - Search game by title
+            1 - Type a game title and proposed price to analyze a deal (case sensitive!!!)
             2 - Exit""")
         choice = input("Enter your choice: ").strip()
-        
+
         if choice == "2":
             break
-    
+
+        elif choice == "0":
+            try:
+                snippet = read_search_term()
+                games = list_games_by_snippet(snippet)
+                print(f"Found {len(games)} games:")
+                for game in games:
+                    print(f"  - {game}")
+            except ValueError as error:
+                print(f"Error: {error}")
+            except PyMongoError:
+                logger.exception("MongoDB unavailable while searching for games")
+                print("Could not access the game catalog. Please try again later.")
+            except Exception:
+                logger.exception("Unexpected error while searching for games")
+                print("Could not search for games. Please try again.")
+            continue
+
         elif choice == "1":
             try:
                 title = read_title()
@@ -63,13 +99,15 @@ def main():
                         cache_status = "MISS"
 
                         redis_client.setex(
-                                cache_key,
-                                300,  # 5 minutes by default
-                                json.dumps(advice),
-                            )
-                        
+                            cache_key,
+                            300,  # 5 minutes by default
+                            json.dumps(advice),
+                        )
+
                 except RedisError:
-                    logger.warning("Redis unavailable, falling back to analysis without caching")
+                    logger.warning(
+                        "Redis unavailable, falling back to analysis without caching", exc_info=True
+                    )
                     cache_status = "BYPASS"
 
                     # Fallback
@@ -87,18 +125,20 @@ def main():
                 print("-----------------------------------------")
 
                 print(f"Cache status for this query: {cache_status}")
-            
-            except ValueError as error: 
-                print(f"{error}")
+
+            except ValueError as error:
+                print(error)
                 continue
-            except Exception as error:
-                print(f"An unexpected error occurred: {error}")
+            except Exception:
+                # Inclui automaticamente o traceback
+                logger.exception("An unexpected error occurred while analyzing deal.")
+                print("An unexpected error occurred, try again.")
                 continue
 
-    
         else:
-            print("Invalid choice. Please enter 1 or 2.")
+            print("Invalid choice. Please enter 0, 1 or 2.")
             continue
+
 
 if __name__ == "__main__":
     main()
