@@ -223,11 +223,11 @@ def parse_game(element):
 
 if __name__ == "__main__":
     logger.info("Starting Steam scraper...")
-    total_pages = 25
+    total_pages = 20
     all_records = []
     seen_urls = set()
 
-    for page in range(10, total_pages + 1):
+    for page in range(1, total_pages + 1):
         scrapped_page = fetch_page(page, max_retries=3, timeout=10)
         if scrapped_page is None:
             logger.warning(f"Failed to fetch page {page}. Skipping.")
